@@ -27,8 +27,27 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      - 
       - name: Extract Android project
         run: |
+          set -e
+          echo "Checking project ZIP..."
+          ls -lah *.zip
+          ZIP_FILE="LuxeCalc-Android-Project-Updated.zip"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "Updated project ZIP not found"
+            exit 1
+          fi
+          mkdir -p app-source launcher-icons
+          unzip -t "$ZIP_FILE"
+          unzip -oq "$ZIP_FILE" -d app-source
+          echo "Project extracted successfully"
+          unzip -t LuxeCalc-Launcher-Icon-Pack.zip
+          unzip -oq LuxeCalc-Launcher-Icon-Pack.zip -d launcher-icons
+          echo "Icon pack extracted successfully"
+          find app-source -name AndroidManifest.xml
+          find launcher-icons -type d -name res
+
           ZIP_FILE="LuxeCalc-Android-Project-Updated.zip"
           if [ -z "$ZIP_FILE" ]; then
             echo "Project ZIP not found"
