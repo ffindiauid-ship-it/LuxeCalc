@@ -29,13 +29,15 @@ jobs:
 
       - name: Extract Android project
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' ! -iname 'LuxeCalc-Launcher-Icon-Pack.zip' | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
             echo "Project ZIP not found"
             exit 1
           fi
           mkdir -p app-source
           unzip -q "$ZIP_FILE" -d app-source
+          unzip -q LuxeCalc-Launcher-Icon-Pack.zip -d launcher-icons
+          cp -R launcher-icons/res/. app-source/app/src/main/res/
           test -f app-source/settings.gradle.kts
 
       - name: Setup Gradle
