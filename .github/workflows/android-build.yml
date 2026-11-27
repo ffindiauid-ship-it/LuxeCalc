@@ -32,7 +32,7 @@ jobs:
           echo "Files in repository:"
           ls -lah
 
-          ZIP_FILE="1.LuxeCalc-Android-Project-Updated.zip..zip"
+          ZIP_FILE="1LuxeCalc-Android-Project-Updated.zip..zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "ERROR: Project ZIP not found: $ZIP_FILE"
