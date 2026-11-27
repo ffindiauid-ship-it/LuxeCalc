@@ -27,7 +27,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - 
       - name: Extract Android project
         run: |
           set -e
