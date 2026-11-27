@@ -19,113 +19,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install unzip
-        run: sudo apt-get update && sudo apt-get install -y unzip
-
-      - name: Extract Android project
-        run: |
-          set -e
-
-          echo "Finding updated Android project ZIP..."
-
-          ZIP_FILE="LuxeCalc-Android-Project-Updated.zip..zip"
-
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "Updated project ZIP not found!"
-            echo "Available ZIP files:"
-            ls -lah *.zip
-            exit 1
-          fi
-
-          mkdir -p app-source
-
-          unzip -t "$ZIP_FILE"
-          unzip -oq "$ZIP_FILE" -d app-source
-
-          echo "Android project extracted."
-
-      - name: Locate Android project
-        run: |
-          set -e
-
-          SETTINGS_FILE=$(find app-source -name settings.gradle.kts -o -name settings.gradle | head -n 1)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "Gradle settings file not found."
-            find app-source -maxdepth 4 -type f
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Android project: $PROJECT_DIR"
-
-          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "Android app Gradle file not found."
-            exit 1
-          fi
-
-      - name: Extract and install LuxeCalc icons
-        run: |
-          set -e
-
-          ICON_ZIP="LuxeCalc-Launcher-Icon-Pack.zip"
-
-          if [ ! -f "$ICON_ZIP" ]; then
-            echo "Launcher icon ZIP not found."
-            exit 1
-          fi
-
-          mkdir -p launcher-icons
-
-          unzip -t "$ICON_ZIP"
-          unzip -oq "$ICON_ZIP" -d launcher-icons
-
-          ICON_RES=$(find launcher-icons -type d -name res | head -n 1)
-
-          if [ -z "$ICON_RES" ]; then
-            echo "Icon res folder not found."
-            find launcher-icons -maxdepth 4 -type f
-            exit 1
-          fi
-
-          mkdir -p "$PROJECT_DIR/app/src/main/res"
-
-          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            SOURCE="$ICON_RES/mipmap-$density"
-            DEST="$PROJECT_DIR/app/src/main/res/mipmap-$density"
-
-            if [ -d "$SOURCE" ]; then
-              mkdir -p "$DEST"
-              cp -f "$SOURCE"/*.png "$DEST/"
-            else
-              echo "Missing icon folder: $SOURCE"
-              exit 1
-            fi
-          done
-
-          echo "LuxeCalc icons installed."
-
-      - name: Check launcher manifest
-        run: |
-          set -e
-
-          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-
-          if [ ! -f "$MANIFEST" ]; then
-            echo "AndroidManifest.xml not found."
-            exit 1
-          fi
-
-          grep -q 'android:icon="@mipmap/ic_launcher"' "$MANIFEST" || {
-            echo "Launcher icon reference missing from manifest."
-            exit 1
-          }
-
-          echo "Launcher manifest reference found."
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -135,9 +28,132 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
+      - name: Extract Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ZIP_FILE="1.LuxeCalc-Android-Project-Updated.zip..zip"
+
+          echo "Checking project ZIP..."
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "Project ZIP not found!"
+            ls -lah
+            exit 1
+          fi
+
+          unzip -t "$ZIP_FILE"
+
+          mkdir -p app-source
+          unzip -oq "$ZIP_FILE" -d app-source
+
+          echo "Project ZIP extracted."
+
+      - name: Locate Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SETTINGS_FILE=$(find app-source \
+            -type f \( -name settings.gradle -o -name settings.gradle.kts \) \
+            -print -quit)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "Gradle settings file not found."
+            find app-source -maxdepth 5 -type f
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "Android app Gradle file not found."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Found Android project: $PROJECT_DIR"
+
+      - name: Extract and install LuxeCalc icons
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ICON_ZIP="LuxeCalc-Launcher-Icon-Pack.zip"
+
+          if [ ! -f "$ICON_ZIP" ]; then
+            echo "Icon ZIP not found!"
+            exit 1
+          fi
+
+          unzip -t "$ICON_ZIP"
+
+          mkdir -p launcher-icons
+          unzip -oq "$ICON_ZIP" -d launcher-icons
+
+          ICON_RES=$(find launcher-icons \
+            -type d -name res -print -quit)
+
+          if [ -z "$ICON_RES" ]; then
+            echo "Icon res folder not found."
+            find launcher-icons -maxdepth 5 -type f
+            exit 1
+          fi
+
+          mkdir -p "$PROJECT_DIR/app/src/main/res"
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            SOURCE="$ICON_RES/mipmap-$density"
+            DEST="$PROJECT_DIR/app/src/main/res/mipmap-$density"
+
+            if [ ! -d "$SOURCE" ]; then
+              echo "Missing folder: $SOURCE"
+              exit 1
+            fi
+
+            mkdir -p "$DEST"
+
+            for icon in ic_launcher.png ic_launcher_round.png; do
+              if [ ! -f "$SOURCE/$icon" ]; then
+                echo "Missing icon: $SOURCE/$icon"
+                exit 1
+              fi
+
+              cp "$SOURCE/$icon" "$DEST/$icon"
+            done
+          done
+
+          echo "All LuxeCalc launcher icons installed."
+
+      - name: Check launcher manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          if [ ! -f "$MANIFEST" ]; then
+            echo "AndroidManifest.xml not found."
+            exit 1
+          fi
+
+          grep -q 'android:icon="@mipmap/ic_launcher"' "$MANIFEST" || {
+            echo "Launcher icon reference missing."
+            exit 1
+          }
+
+          echo "Launcher icon reference verified."
+
       - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
         run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
@@ -148,5 +164,6 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
 
 
