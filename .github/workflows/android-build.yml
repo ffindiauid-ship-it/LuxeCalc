@@ -29,7 +29,7 @@ jobs:
 
       - name: Extract Android project
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' ! -iname 'LuxeCalc-Launcher-Icon-Pack.zip' | head -n 1)
+          ZIP_FILE="LuxeCalc-Android-Project-Updated.zip"
           if [ -z "$ZIP_FILE" ]; then
             echo "Project ZIP not found"
             exit 1
