@@ -27,7 +27,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-        name: Extract Android project
+      - name: Extract Android project
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' ! -iname 'LuxeCalc-Launcher-Icon-Pack.zip' | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
