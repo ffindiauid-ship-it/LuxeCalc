@@ -27,7 +27,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Extract Android project
+        name: Extract Android project
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' ! -iname 'LuxeCalc-Launcher-Icon-Pack.zip' | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
@@ -36,9 +36,11 @@ jobs:
           fi
           mkdir -p app-source
           unzip -q "$ZIP_FILE" -d app-source
-          unzip -q LuxeCalc-Launcher-Icon-Pack.zip -d launcher-icons
-          cp -R launcher-icons/res/. app-source/app/src/main/res/
+          unzip -oq LuxeCalc-Launcher-Icon-Pack.zip -d launcher-icons
+          mkdir -p app-source/app/src/main/res
+          cp -R launcher-icons/LuxeCalc-Launcher-Icon-Pack/res/. app-source/app/src/main/res/
           test -f app-source/settings.gradle.kts
+
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
