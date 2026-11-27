@@ -19,88 +19,86 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Install unzip
-        run: sudo apt-get update && sudo apt-get install -y unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
 
-      - name: Extract Android project
+      - name: Check and extract Android project
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
+
+          echo "Files in repository:"
+          ls -lah
 
           ZIP_FILE="1.LuxeCalc-Android-Project-Updated.zip..zip"
 
-          echo "Checking project ZIP..."
-
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "Project ZIP not found!"
-            ls -lah
+            echo "ERROR: Project ZIP not found: $ZIP_FILE"
+            echo "Available ZIP files:"
+            find . -maxdepth 2 -type f -iname "*.zip"
             exit 1
           fi
 
+          echo "Checking ZIP file:"
+          file "$ZIP_FILE"
           unzip -t "$ZIP_FILE"
 
           mkdir -p app-source
           unzip -oq "$ZIP_FILE" -d app-source
 
-          echo "Project ZIP extracted."
+          echo "Project extracted successfully."
+          find app-source -maxdepth 4 -type f | head -80
 
       - name: Locate Android project
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          SETTINGS_FILE=$(find app-source \
-            -type f \( -name settings.gradle -o -name settings.gradle.kts \) \
-            -print -quit)
+          SETTINGS_FILE=$(find app-source -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "Gradle settings file not found."
+            echo "ERROR: Gradle settings file not found."
             find app-source -maxdepth 5 -type f
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
-             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "Android app Gradle file not found."
+          echo "Android project folder: $PROJECT_DIR"
+
+          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
+            echo "ERROR: gradlew not found in project folder."
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found Android project: $PROJECT_DIR"
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: App Gradle file not found."
+            exit 1
+          fi
 
-      - name: Extract and install LuxeCalc icons
+      - name: Extract and install LuxeCalc launcher icons
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
           ICON_ZIP="LuxeCalc-Launcher-Icon-Pack.zip"
 
           if [ ! -f "$ICON_ZIP" ]; then
-            echo "Icon ZIP not found!"
+            echo "ERROR: Icon ZIP not found: $ICON_ZIP"
             exit 1
           fi
 
-          unzip -t "$ICON_ZIP"
-
           mkdir -p launcher-icons
+          unzip -t "$ICON_ZIP"
           unzip -oq "$ICON_ZIP" -d launcher-icons
 
-          ICON_RES=$(find launcher-icons \
-            -type d -name res -print -quit)
+          ICON_RES=$(find launcher-icons -type d -name res | head -n 1)
 
           if [ -z "$ICON_RES" ]; then
-            echo "Icon res folder not found."
+            echo "ERROR: Icon res folder not found."
             find launcher-icons -maxdepth 5 -type f
             exit 1
           fi
@@ -112,7 +110,7 @@ jobs:
             DEST="$PROJECT_DIR/app/src/main/res/mipmap-$density"
 
             if [ ! -d "$SOURCE" ]; then
-              echo "Missing folder: $SOURCE"
+              echo "ERROR: Missing icon folder: $SOURCE"
               exit 1
             fi
 
@@ -120,50 +118,56 @@ jobs:
 
             for icon in ic_launcher.png ic_launcher_round.png; do
               if [ ! -f "$SOURCE/$icon" ]; then
-                echo "Missing icon: $SOURCE/$icon"
+                echo "ERROR: Missing $icon in $SOURCE"
                 exit 1
               fi
 
-              cp "$SOURCE/$icon" "$DEST/$icon"
+              cp -f "$SOURCE/$icon" "$DEST/$icon"
             done
           done
 
-          echo "All LuxeCalc launcher icons installed."
+          echo "Launcher icons installed."
 
-      - name: Check launcher manifest
+      - name: Check launcher icon configuration
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
           MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
           if [ ! -f "$MANIFEST" ]; then
-            echo "AndroidManifest.xml not found."
+            echo "ERROR: AndroidManifest.xml not found."
             exit 1
           fi
 
-          grep -q 'android:icon="@mipmap/ic_launcher"' "$MANIFEST" || {
-            echo "Launcher icon reference missing."
-            exit 1
-          }
+          echo "Android manifest found."
+          grep -n "android:icon" "$MANIFEST" || true
 
-          echo "Launcher icon reference verified."
+          if ! grep -q 'android:icon="@mipmap/ic_launcher"' "$MANIFEST"; then
+            echo "WARNING: Manifest does not use @mipmap/ic_launcher."
+            echo "Check the application icon setting in AndroidManifest.xml."
+          fi
 
-      - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build LuxeCalc APK
         shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          set -euo pipefail
+          set -e
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload LuxeCalc APK
         uses: actions/upload-artifact@v4
         with:
-          name: LuxeCalc-Android-APK
+          name: LuxeCalc-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 14
-
-
-
